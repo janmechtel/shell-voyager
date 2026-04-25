@@ -34,6 +34,34 @@ voyager
 ```
 in any project directory to see a summary of the most useful commands that you and the AI have executed successfully in that directory.
 
+## Keyboard Shortcuts
+
+You can bind `voyager` to a keyboard shortcut (e.g., `Ctrl+Up`) in your shell profile (`~/.bashrc`, `~/.zshrc`, or `~/.profile`).
+
+### Bash & Zsh Configuration
+
+Add the following to your profile (adjusting `voyager` to its full path if needed, or `node /path/to/shell-voyager/dist/cli.js`):
+
+```sh
+# shell-voyager keybinding (Ctrl+Up)
+if [[ -n "$BASH_VERSION" && $- == *i* ]]; then
+    bind -x '"\e[1;5A": "READLINE_LINE=$(voyager </dev/tty); READLINE_POINT=${#READLINE_LINE}"'
+elif [[ -n "$ZSH_VERSION" ]]; then
+    _voyager_widget() {
+        zle -I
+        local selected
+        selected=$(voyager </dev/tty)
+        if [[ -n "$selected" ]]; then
+            BUFFER="$selected"
+            CURSOR=${#BUFFER}
+        fi
+        zle reset-prompt
+    }
+    zle -N _voyager_widget
+    bindkey '^[[1;5A' _voyager_widget
+fi
+```
+
 ## How it works
 
 1. The user uses the terminal with Atuin enabled (as usual).
