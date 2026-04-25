@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import "./env.js";
+
 import { execSync } from "child_process";
 import { Box, render, Text, useApp, useInput } from "ink";
 import TextInput from "ink-text-input";
@@ -56,119 +58,116 @@ function fetchHistory(): CommandEntry[] {
 	return entries;
 }
 
-function normalizeCommand(cmd: string): { cmd: string; params: string } {
-	const trimmed = cmd.trim();
-	const parts = trimmed.split(/\s+/);
-	if (parts.length === 0 || !parts[0]) return { cmd: "", params: "" };
+function getGroupLength(cmdWords: string[], queryText: string): number {
+	if (!queryText.trim()) return 1;
 
-	const first = parts[0];
-	let numParts = 1;
-
-	if (
-		["npm", "yarn", "pnpm", "git", "cargo", "docker", "kubectl"].includes(first)
-	) {
-		if (parts.length > 1) {
-			if (first === "npm" && parts[1] === "run" && parts.length > 2) {
-				numParts = 3;
-			} else {
-				numParts = 2;
-			}
+	const qWords = queryText.split(/\s+/);
+	let exactMatches = 0;
+	for (let i = 0; i < qWords.length; i++) {
+		if (
+			i < cmdWords.length &&
+			qWords[i] !== "" &&
+			qWords[i].toLowerCase() === cmdWords[i].toLowerCase()
+		) {
+			exactMatches++;
+		} else {
+			break;
 		}
 	}
 
-	const normalizedCmd = parts.slice(0, numParts).join(" ");
-
-	let idx = 0;
-	for (let i = 0; i < numParts; i++) {
-		idx = trimmed.indexOf(parts[i], idx) + parts[i].length;
-	}
-	const params = trimmed.substring(idx).trim();
-
-	return { cmd: normalizedCmd, params };
-}
-
-interface CommandStat {
-	cmd: string;
-	count: number;
-	aiCount: number;
-	maxCount: number;
-	params: string;
-}
-
-function analyze(entries: CommandEntry[]): CommandStat[] {
-	const normalizedCounts: Record<
-		string,
-		{ count: number; aiCount: number; paramCounts: Record<string, number> }
-	> = {};
-
-	for (let i = 0; i < entries.length; i++) {
-		const entry = entries[i];
-		if (entry.exitCode === 2 || entry.exitCode === 127) {
-			continue;
-		}
-
-		const { cmd: normalized, params } = normalizeCommand(entry.command);
-		if (!normalized) continue;
-
-		if (!normalizedCounts[normalized]) {
-			normalizedCounts[normalized] = { count: 0, aiCount: 0, paramCounts: {} };
-		}
-
-		normalizedCounts[normalized].count++;
-		if (entry.isAi) {
-			normalizedCounts[normalized].aiCount++;
-		}
-
-		if (params) {
-			normalizedCounts[normalized].paramCounts[params] =
-				(normalizedCounts[normalized].paramCounts[params] || 0) + 1;
-		}
-	}
-
-	const sorted = Object.entries(normalizedCounts).sort(
-		(a, b) => b[1].count - a[1].count,
-	);
-	const maxCount = sorted.length > 0 ? sorted[0][1].count : 0;
-
-	return sorted.map(([cmd, stats]) => {
-		const sortedParams = Object.entries(stats.paramCounts)
-			.sort((a, b) => b[1] - a[1])
-			.map((x) => x[0]);
-		return {
-			cmd,
-			count: stats.count,
-			aiCount: stats.aiCount,
-			maxCount,
-			params: sortedParams.join(", "),
-		};
-	});
+	return Math.min(exactMatches + 1, cmdWords.length);
 }
 
 const App = ({
-	items,
+	history,
+	initialQuery,
 	onSelect,
 }: {
-	items: CommandStat[];
+	history: CommandEntry[];
+	initialQuery: string;
 	onSelect: (cmd: string) => void;
 }) => {
 	const { exit } = useApp();
-	const [query, setQuery] = useState("");
+	const [query, setQuery] = useState(initialQuery);
 	const [selectedIndex, setSelectedIndex] = useState(0);
 	const [isExiting, setIsExiting] = useState(false);
 
-	const filteredItems = useMemo(() => {
-		if (!query) return items;
+	const items = useMemo(() => {
 		const lowerQuery = query.toLowerCase();
-		return items.filter((i) => i.cmd.toLowerCase().includes(lowerQuery));
-	}, [items, query]);
+
+		const normalizedCounts: Record<
+			string,
+			{ count: number; aiCount: number; paramCounts: Record<string, number> }
+		> = {};
+
+		for (let i = 0; i < history.length; i++) {
+			const entry = history[i];
+			if (entry.exitCode === 2 || entry.exitCode === 127) {
+				continue;
+			}
+
+			if (lowerQuery && !entry.command.toLowerCase().includes(lowerQuery)) {
+				continue;
+			}
+
+			const trimmed = entry.command.trim();
+			const cmdWords = trimmed.split(/\s+/);
+			if (cmdWords.length === 0 || !cmdWords[0]) continue;
+
+			const numParts = getGroupLength(cmdWords, query);
+			const normalizedCmd = cmdWords.slice(0, numParts).join(" ");
+
+			let idx = 0;
+			for (let j = 0; j < numParts; j++) {
+				idx = trimmed.indexOf(cmdWords[j], idx) + cmdWords[j].length;
+			}
+			const params = trimmed.substring(idx).trim();
+
+			if (!normalizedCounts[normalizedCmd]) {
+				normalizedCounts[normalizedCmd] = {
+					count: 0,
+					aiCount: 0,
+					paramCounts: {},
+				};
+			}
+
+			normalizedCounts[normalizedCmd].count++;
+			if (entry.isAi) {
+				normalizedCounts[normalizedCmd].aiCount++;
+			}
+
+			if (params) {
+				normalizedCounts[normalizedCmd].paramCounts[params] =
+					(normalizedCounts[normalizedCmd].paramCounts[params] || 0) + 1;
+			}
+		}
+
+		const sorted = Object.entries(normalizedCounts).sort(
+			(a, b) => b[1].count - a[1].count,
+		);
+		const maxCount = sorted.length > 0 ? sorted[0][1].count : 0;
+
+		return sorted.map(([cmd, stats]) => {
+			const sortedParams = Object.entries(stats.paramCounts)
+				.sort((a, b) => b[1] - a[1])
+				.map((x) => x[0]);
+			return {
+				cmd,
+				count: stats.count,
+				aiCount: stats.aiCount,
+				maxCount,
+				params: sortedParams.join(", "),
+			};
+		});
+	}, [history, query]);
 
 	useInput((_input, key) => {
 		if (key.upArrow) {
 			setSelectedIndex(Math.max(0, selectedIndex - 1));
 		} else if (key.downArrow) {
-			setSelectedIndex(Math.min(filteredItems.length - 1, selectedIndex + 1));
+			setSelectedIndex(Math.min(items.length - 1, selectedIndex + 1));
 		} else if (key.return) {
-			const selected = filteredItems[selectedIndex];
+			const selected = items[selectedIndex];
 			setIsExiting(true);
 			exit();
 			if (selected) {
@@ -196,7 +195,7 @@ const App = ({
 		<Box flexDirection="column" padding={1} width="100%">
 			<Box flexDirection="column" marginBottom={1}>
 				<Text color="yellow" bold>
-					🌟 Voyager Cheat Sheet 🌟
+					🌟 Voyager Cheat Sheet (v1.0.1) 🌟
 				</Text>
 				<Box>
 					<Text color="cyan">Search: </Text>
@@ -224,13 +223,20 @@ const App = ({
 					</Text>
 				</Box>
 
-				{filteredItems.slice(0, 15).map((item, index) => {
+				{items.slice(0, 15).map((item, index) => {
 					const isSelected = index === selectedIndex;
 					const barLength =
 						item.maxCount > 0
 							? Math.round((item.count / item.maxCount) * 20)
 							: 0;
-					const barStr = "█".repeat(barLength).padEnd(20, " ");
+					const aiBarLength =
+						item.count > 0
+							? Math.round((item.aiCount / item.count) * barLength)
+							: 0;
+					const manualBarLength = barLength - aiBarLength;
+					const manualBarStr = "█".repeat(manualBarLength);
+					const aiBarStr = "█".repeat(aiBarLength);
+					const padStr = " ".repeat(20 - barLength);
 					const aiTag =
 						item.aiCount > 0
 							? item.aiCount.toString().padStart(4, " ")
@@ -250,7 +256,12 @@ const App = ({
 									{isSelected ? "> " : "  "}
 									{cmdStr} |
 								</Text>
-								<Text color="cyan"> {barStr} </Text>
+								<Text>
+									{" "}
+									<Text color="cyan">{manualBarStr}</Text>
+									<Text color="magenta">{aiBarStr}</Text>
+									{padStr}{" "}
+								</Text>
 								<Text color={isSelected ? "green" : undefined}>
 									| {aiTag} | {countStr} |{" "}
 								</Text>
@@ -263,7 +274,7 @@ const App = ({
 						</Box>
 					);
 				})}
-				{filteredItems.length === 0 && (
+				{items.length === 0 && (
 					<Box marginTop={1}>
 						<Text dimColor>No matches found</Text>
 					</Box>
@@ -275,8 +286,8 @@ const App = ({
 
 async function run() {
 	try {
+		const initialQuery = process.argv.slice(2).join(" ");
 		const history = fetchHistory();
-		const stats = analyze(history);
 
 		let selectedCommand: string | null = null;
 
@@ -285,7 +296,8 @@ async function run() {
 
 		const { waitUntilExit, unmount } = render(
 			<App
-				items={stats}
+				history={history}
+				initialQuery={initialQuery}
 				onSelect={(cmd) => {
 					selectedCommand = cmd;
 				}}
