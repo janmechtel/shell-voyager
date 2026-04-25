@@ -11,8 +11,13 @@ export default function (pi: any) {
 		const originalCommand = input.command.trim();
 		if (!originalCommand) return;
 
+		// Strip the export GIT_TERMINAL_PROMPT=0 injected by entire so it doesn't clutter Atuin history
+		const displayCommand = originalCommand
+			.replace(/^export GIT_TERMINAL_PROMPT=0\n?/, "")
+			.trim();
+
 		// Append #ai to the tracked command to tag it
-		const trackedCommand = `${originalCommand} #ai`;
+		const trackedCommand = `${displayCommand} #ai`;
 		const trackedCommandStr = JSON.stringify(trackedCommand);
 
 		input.command = `

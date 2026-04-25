@@ -2,20 +2,27 @@
 	"name": "shell-voyager",
 	"version": "1.0.0",
 	"description": "",
+	"type": "module",
 	"main": "index.js",
 	"scripts": {
 		"build": "tsc",
-		"start": "tsx src/cli.ts"
+		"start": "tsx src/cli.tsx"
 	},
 	"keywords": [],
 	"author": "",
 	"license": "ISC",
 	"devDependencies": {
 		"@types/node": "^25.6.0",
+		"@types/react": "^19.2.14",
 		"tsx": "^4.21.0",
 		"typescript": "^6.0.3"
 	},
 	"bin": {
 		"voyager": "./dist/cli.js"
+	},
+	"dependencies": {
+		"ink": "^7.0.1",
+		"ink-text-input": "^6.0.0",
+		"react": "^19.2.5"
 	}
 }
