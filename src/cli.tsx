@@ -212,14 +212,12 @@ const App = ({
 			<Box flexDirection="column" width="100%">
 				<Box width="100%">
 					<Text bold wrap="truncate">
-						{"Command".padEnd(maxCmdLen, " ")} | {"Frequency".padEnd(20, " ")} |
-						🤖 AI | Count | Parameters
+						{`${"Command".padEnd(maxCmdLen + 2, " ")} | ${"Frequency".padEnd(20, " ")} | 🤖 AI | Count | Parameters`}
 					</Text>
 				</Box>
 				<Box width="100%">
 					<Text dimColor wrap="truncate">
-						{"-".repeat(maxCmdLen + 2)}+{"-".repeat(22)}
-						+-------+-------+------------
+						{`${"-".repeat(maxCmdLen + 3)}+${"-".repeat(22)}+-------+-------+------------`}
 					</Text>
 				</Box>
 
@@ -239,8 +237,8 @@ const App = ({
 					const padStr = " ".repeat(20 - barLength);
 					const aiTag =
 						item.aiCount > 0
-							? item.aiCount.toString().padStart(4, " ")
-							: "    ";
+							? item.aiCount.toString().padStart(5, " ")
+							: "     ";
 					const countStr = item.count.toString().padStart(5, " ");
 					const cmdStr = item.cmd
 						.padEnd(maxCmdLen, " ")
