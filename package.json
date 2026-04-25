@@ -1,0 +1,21 @@
+{
+	"name": "shell-voyager",
+	"version": "1.0.0",
+	"description": "",
+	"main": "index.js",
+	"scripts": {
+		"build": "tsc",
+		"start": "tsx src/cli.ts"
+	},
+	"keywords": [],
+	"author": "",
+	"license": "ISC",
+	"devDependencies": {
+		"@types/node": "^25.6.0",
+		"tsx": "^4.21.0",
+		"typescript": "^6.0.3"
+	},
+	"bin": {
+		"voyager": "./dist/cli.js"
+	}
+}
