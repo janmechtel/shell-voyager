@@ -1,5 +1,7 @@
 # Shell Voyager
 
+![Shell Voyager Screenshot](assets/screenshot.png)
+
 A system that learns from shell commands, acting as an automatic cheat sheet of frequently used and successful commands per working directory. This helps both the user and the AI (like Pi.dev) remember useful workflows.
 
 Inspired by NVIDIA's Voyager, this tool tracks shell history, identifies successful commands, and tags AI-generated ones. 
